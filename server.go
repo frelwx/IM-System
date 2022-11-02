@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -45,31 +46,41 @@ func (s *Server) Broadcast(user *User, msg string) {
 }
 func (s *Server) Handler(connect net.Conn) {
 	// user online!!
-	user := NewUser(connect)
-	s.mapLock.Lock()
-	s.OnlineMap[user.Name] = user
-	s.mapLock.Unlock()
+	user := NewUser(connect, s)
+	user.OnLine()
 
-	// broadcast to other user
-	s.Broadcast(user, "Im online")
-
+	IsAlive := make(chan bool)
 	go func() {
-		buf := 	make([]byte, 4096)
+		buf := make([]byte, 4096)
 		for {
 			n, err := connect.Read(buf)
-			if(n == 0) {
-				s.Broadcast(user, "off line!")
+			if n == 0 {
+				fmt.Println("n == 0", err)
+				user.OffLine()
 				return
 			}
-			if(err != nil && err != io.EOF) {
+			if err != nil && err != io.EOF {
 				fmt.Println(fmt.Println("conn message error", err))
-				return 
+				return
 			}
 
-			msg := string(buf[ : n - 1])
-			s.Broadcast(user, msg)
+			msg := string(buf[:n-1])
+			fmt.Println("server received: ", msg)
+			user.DoMessage(msg)
+			IsAlive <- true
 		}
 	}()
+
+	for {
+		select {
+		case <-IsAlive:
+		case <-time.After(time.Second * 60 * 2):
+			user.SendMsg("you are kicked!!")
+			connect.Close()
+			return
+		}
+	}
+
 }
 
 func (s *Server) Start() {
