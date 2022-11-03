@@ -80,6 +80,7 @@ func (u *User) DoMessage(msg string) {
 			u.server.OnlineMap[NewName] = u
 			u.server.mapLock.Unlock()
 			u.Name = NewName
+			u.SendMsg("sucessfully update name to" + NewName + "\n")
 		}
 	} else if len(msg) > 3 && msg[:3] == "to|" {
 		msgSplit := strings.Split(msg, "|")
